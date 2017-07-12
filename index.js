@@ -130,7 +130,7 @@ function start_websocket_client(logging_channel) {
   ws.on('close', function close()
   {
     send(logging_channel, "[WSMSG]", 'disconnected');
-    setTimeout(start_websocket_client, 10);
+    setTimeout(()=>{start_websocket_client(logging_channel)}, 10);
   });
 
 }
@@ -154,7 +154,7 @@ client.on('ready', () => {
 
 
 client.on('message', message => {
-  console.log("[MSG]", message.author, message.content);
+  //console.log("[MSG]", message.author, message.content);
   if (message.content === 'yui restart' && message.author.id == "122908555178147840")
   {
     message.reply('Okie~ be right back!');
