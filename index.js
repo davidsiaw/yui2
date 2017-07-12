@@ -3,120 +3,166 @@ const Icy = require('icy');
 const client = new Discord.Client();
 const WebSocket = require('ws');
 
-client.on('ready', () => {
-  console.log('I am ready!');
+function send(channel)
+{
+  try
+  {
+    var message = "[" + new Date() + "]";
+    for (var idx in arguments)
+    {
+      if (idx == 0) { continue; }
+      message += " "
+      message += arguments[idx]
+    }
+    channel.send(message);
+  }
+  catch (e)
+  {
+    console.log("[SEND]", e)
+  }
+}
 
-  var required_channels = process.env.CHANNEL_ID
-
+function find_channel(client, chan_id, on_success, on_failure)
+{
   var channels = [];
 
   client.guilds.map( (g) => {
     g.channels.
-      filter( (c) => { return required_channels.indexOf(c.id) != -1; } ).
+      filter( (c) => { return chan_id.indexOf(c.id) != -1; } ).
       map ( (c) => { channels.push(c) } );
   });
 
-  channels.map((c)=> {
-    c.join()
-     .then(connection => {
+  if (channels.length == 1)
+  {
+    on_success(channels[0]);
+  }
+  else
+  {
+    on_failure(chan_id);
+  }
+}
 
-      var current_stream = null;
-      var icy_type = true;
+function not_find_chan(chan)
+{
+  console.log("could not find channel", chan_id)
+}
 
-      function setup_events() {
-
-        current_stream.on("start", function(){
-          console.log("[SETUP]", "started", c.id)
-        });
-
-        current_stream.on("error", function(e){
-          console.log("[SETUP]", "errored!");
-          console.log("[SETUP]", e);
-          current_stream.end();
-          start();
-        });
-
-        current_stream.on("end", function(e){
-          console.log("[SETUP]", "ended!", c.id);
-          setTimeout(start, 5000);
-        });
-      }
-
-      function start() {
-
-        if (icy_type)
-        {
-          Icy.get("http://listen.moe:9999/stream", function (res) {
-
-            // log the HTTP response headers
-            console.error("[START]", res.headers);
-
-            // log any "metadata" events that happen
-            res.on('metadata', function (metadata) {
-              var parsed = Icy.parse(metadata);
-              console.error(parsed);
-            });
-
-            current_stream = connection.playStream(res, function(err, str) {console.log("[ERR]", err); console.log("[STR]", str)} );
-            setup_events();
-
-          });
-        }
-        else
-        {
-          current_stream = connection.playArbitraryInput("http://listen.moe:9999/stream");
-          setup_events();
-        }
-      }
-
-      start();
-
-     })
-     .catch(console.error);
+function setup_events(current_stream, c, connection, icy_type, logging_channel)
+{
+  current_stream.on("start", function(){
+    send(logging_channel, "[SETUP]", "started", c.id)
   });
 
+  current_stream.on("error", function(e){
+    send(logging_channel, "[SETUP]", "errored!");
+    send(logging_channel, "[SETUP]", e);
+    current_stream.end();
+    setTimeout(()=>{start(c, connection, icy_type);}, 500);
+  });
 
-  function start_websocket_client() {
+  current_stream.on("end", function(e){
+    send(logging_channel, "[SETUP]", "ended!", c.id);
+    setTimeout(()=>{start(c, connection, icy_type);}, 500);
+  });
+}
 
-    var ws = new WebSocket('wss://listen.moe/api/v2/socket');
+function start(c, connection, icy_type, logging_channel)
+{
+  if (icy_type)
+  {
+    Icy.get("http://listen.moe:9999/stream", function (res) {
 
-    ws.on('open', function open() {
-      console.log('connected');
+      // log the HTTP response headers
+      send(logging_channel, "[START]", res.headers);
+
+      // log any "metadata" events that happen
+      res.on('metadata', function (metadata) {
+        var parsed = Icy.parse(metadata);
+        send(logging_channel, "```\n", parsed, "\n```");
+      });
+
+      var current_stream = connection.playStream(res, function(err, str) {
+        send(logging_channel, "[STRIMERROR]", err); 
+        send(logging_channel, "[STRIM]", str);
+      } );
+      setup_events(current_stream, c, connection, icy_type, logging_channel);
+
     });
-
-    ws.on('message', function incoming(data) {
-      console.log("[WSMSG]", data);
-
-      try {
-        var data_json = JSON.parse(data);
-
-        console.log("[WSMSG]", data_json);
-
-        if (data_json["song_name"])
-        {
-          client.user.setGame(data_json["song_name"] + " - " + data_json["artist_name"]);
-        }
-      }
-      catch (e) {
-      }
-
-    });
-
-    ws.on('close', function close() {
-      console.log("[WSMSG]", 'disconnected');
-      setTimeout(start_websocket_client, 10);
-    });
-
   }
+  else
+  {
+    var current_stream = connection.playArbitraryInput("http://listen.moe:9999/stream");
+    setup_events(current_stream, c, connection, icy_type);
+  }
+}
 
-  start_websocket_client();
+function play_radio(c, connection, logging_channel)
+{
+  start(c, connection, true, logging_channel);
+}
+
+function start_websocket_client(logging_channel) {
+
+  var ws = new WebSocket('wss://listen.moe/api/v2/socket');
+
+  ws.on('open', function open()
+  {
+    send(logging_channel, "[WSMSG]", 'connected');
+  });
+
+  ws.on('message', function incoming(data) 
+  {
+    try {
+      var data_json = JSON.parse(data);
+
+      send(logging_channel, "[WSMSG]", "```\n", JSON.stringify(data_json, null, 2), "\n```");
+
+      if (data_json["song_name"])
+      {
+        client.user.setGame(data_json["song_name"] + " - " + data_json["artist_name"]);
+      }
+    }
+    catch (e) {
+    }
+
+  });
+
+  ws.on('close', function close()
+  {
+    send(logging_channel, "[WSMSG]", 'disconnected');
+    setTimeout(start_websocket_client, 10);
+  });
+
+}
+
+client.on('ready', () => {
+
+  find_channel(client, "331596661954576385", (logging_channel) => {
+    send(logging_channel, "(re)Started up")
+
+    find_channel(client, process.env.CHANNEL_ID, (c)=> {
+      c.join()
+       .then((connection) => { play_radio(c, connection, logging_channel); })
+       .catch(console.error);
+    }, not_find_chan);
+
+    start_websocket_client(logging_channel);
+
+  }, not_find_chan);
 
 });
 
 
 client.on('message', message => {
-  if (message.content === 'ping') {
-    message.reply('pong');
+  console.log("[MSG]", message.author, message.content);
+  if (message.content === 'yui restart' && message.author.id == "122908555178147840")
+  {
+    message.reply('Okie~ be right back!');
+    client.destroy();
+    setTimeout(() => {
+      process.exit();
+    }, 2000);
+    
   }
 });
 
