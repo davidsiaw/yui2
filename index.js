@@ -70,7 +70,7 @@ function start(c, connection, icy_type, logging_channel)
 {
   if (icy_type)
   {
-    Icy.get("http://listen.moe:9999/stream", function (res) {
+    Icy.get("https://listen.moe/stream", function (res) {
 
       // log the HTTP response headers
       send(logging_channel, "[START]", res.headers);
@@ -91,14 +91,14 @@ function start(c, connection, icy_type, logging_channel)
   }
   else
   {
-    var current_stream = connection.playArbitraryInput("http://listen.moe:9999/stream");
-    setup_events(current_stream, c, connection, icy_type);
+    var current_stream = connection.playArbitraryInput("https://listen.moe/stream");
+    setup_events(current_stream, c, connection, icy_type, logging_channel);
   }
 }
 
 function play_radio(c, connection, logging_channel)
 {
-  start(c, connection, true, logging_channel);
+  start(c, connection, false, logging_channel);
 }
 
 function start_websocket_client(logging_channel) {
@@ -119,7 +119,19 @@ function start_websocket_client(logging_channel) {
 
       if (data_json["song_name"])
       {
-        client.user.setGame(data_json["song_name"] + " - " + data_json["artist_name"]);
+
+        client.user.
+        setGame(data_json["song_name"] + " - " + data_json["artist_name"]).then(
+
+          (successMessage) => {
+            console.log("Yay! " + data_json["song_name"] + " - " + data_json["artist_name"]);
+
+        }).catch(
+
+          (reason) => {
+            console.log('Handle rejected promise ('+reason+') here.');
+
+        });
       }
     }
     catch (e) {

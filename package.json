@@ -1,8 +1,8 @@
 {
   "dependencies": {
-    "discord.js": "^11.1.0",
+    "discord.js": "github:hydrabolt/discord.js#11.1-dev",
     "icy": "^2.1.0",
     "opusscript": "0.0.3",
-    "ws": "^3.0.0"
+    "ws": "^3.1.0"
   }
 }
