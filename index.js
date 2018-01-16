@@ -18,7 +18,10 @@ function send(channel)
   }
   catch (e)
   {
-    console.log("[SEND]", e)
+    console.log("[SENDFAIL]", e)
+    setTimeout(() => {
+      process.exit();
+    }, 100);
   }
 }
 
