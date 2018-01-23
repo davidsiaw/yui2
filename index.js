@@ -3,6 +3,9 @@ const Icy = require('icy');
 const client = new Discord.Client();
 const WebSocket = require('ws');
 
+const LISTEN_MOE_SOCKET_URL = process.env.LISTEN_MOE_SOCKET_URL || "wss://listen.moe/gateway"
+const LISTEN_MOE_STREAM_URL = process.env.LISTEN_MOE_STREAM_URL || "https://listen.moe/stream"
+
 function send(channel)
 {
   try
@@ -73,7 +76,7 @@ function start(c, connection, icy_type, logging_channel)
 {
   if (icy_type)
   {
-    Icy.get("https://listen.moe/stream", function (res) {
+    Icy.get(LISTEN_MOE_STREAM_URL, function (res) {
 
       // log the HTTP response headers
       send(logging_channel, "[START]", res.headers);
@@ -94,7 +97,7 @@ function start(c, connection, icy_type, logging_channel)
   }
   else
   {
-    var current_stream = connection.playArbitraryInput("https://listen.moe/stream");
+    var current_stream = connection.playArbitraryInput(LISTEN_MOE_STREAM_URL);
     setup_events(current_stream, c, connection, icy_type, logging_channel);
   }
 }
@@ -106,11 +109,19 @@ function play_radio(c, connection, logging_channel)
 
 function start_websocket_client(logging_channel) {
 
-  var ws = new WebSocket('wss://listen.moe/api/v2/socket');
+  var ws = new WebSocket(LISTEN_MOE_SOCKET_URL);
+  var heartbeat = null;
 
   ws.on('open', function open()
   {
     send(logging_channel, "[WSMSG]", 'connected');
+    var hello = {op: 0, d: {auth: "Bearer null"}}
+    ws.send(JSON.stringify(hello))
+
+    heartbeat = setInterval(function(){
+      var poke = {op: 9}
+      ws.send(JSON.stringify(poke))
+    }, 30000);
   });
 
   ws.on('message', function incoming(data) 
@@ -120,14 +131,16 @@ function start_websocket_client(logging_channel) {
 
       send(logging_channel, "[WSMSG]", "```\n", JSON.stringify(data_json, null, 2), "\n```");
 
-      if (data_json["song_name"])
+      if (data_json["op"] === 1 && data_json["t"] === "TRACK_UPDATE")
       {
+        var song_name = data_json["d"]["song"]["title"]
+        var artist_name = data_json["d"]["song"]["artists"][0]["name"]
 
         client.user.
-        setGame(data_json["song_name"] + " - " + data_json["artist_name"]).then(
+        setGame(song_name + " - " + artist_name).then(
 
           (successMessage) => {
-            console.log("Yay! " + data_json["song_name"] + " - " + data_json["artist_name"]);
+            console.log("Yay! " + song_name + " - " + artist_name);
 
         }).catch(
 
@@ -136,6 +149,7 @@ function start_websocket_client(logging_channel) {
 
         });
       }
+
     }
     catch (e) {
     }
@@ -145,6 +159,7 @@ function start_websocket_client(logging_channel) {
   ws.on('close', function close()
   {
     send(logging_channel, "[WSMSG]", 'disconnected');
+    clearInterval(heartbeat);
     setTimeout(()=>{start_websocket_client(logging_channel)}, 10);
   });
 
