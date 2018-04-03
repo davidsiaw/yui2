@@ -97,7 +97,12 @@ function start(c, connection, icy_type, logging_channel)
   }
   else
   {
-    var current_stream = connection.playArbitraryInput(LISTEN_MOE_STREAM_URL);
+    var src = LISTEN_MOE_STREAM_URL;
+    if (process.env.SOURCE_FILE)
+    {
+      src = process.env.SOURCE_FILE
+    }
+    var current_stream = connection.playArbitraryInput(src);
     setup_events(current_stream, c, connection, icy_type, logging_channel);
   }
 }
@@ -105,6 +110,24 @@ function start(c, connection, icy_type, logging_channel)
 function play_radio(c, connection, logging_channel)
 {
   start(c, connection, false, logging_channel);
+}
+
+function set_music(client, message)
+{
+  client.user.setActivity(message, {
+    type: "LISTENING",
+    url: "https://astrobunny.net"
+  }).then(
+
+    (successMessage) => {
+      console.log("Set listening to:" + message)
+
+  }).catch(
+
+    (reason) => {
+      console.log('Rejected set_music ('+reason+').');
+
+  });
 }
 
 function start_websocket_client(logging_channel) {
@@ -133,21 +156,16 @@ function start_websocket_client(logging_channel) {
 
       if (data_json["op"] === 1 && data_json["t"] === "TRACK_UPDATE")
       {
-        var song_name = data_json["d"]["song"]["title"]
-        var artist_name = data_json["d"]["song"]["artists"][0]["name"]
-
-        client.user.
-        setGame(song_name + " - " + artist_name).then(
-
-          (successMessage) => {
-            console.log("Yay! " + song_name + " - " + artist_name);
-
-        }).catch(
-
-          (reason) => {
-            console.log('Handle rejected promise ('+reason+') here.');
-
-        });
+        if (process.env.SOURCE_FILE)
+        {
+          set_music(client, process.env.SOURCE_NAME + " - " + process.env.SOURCE_ARTIST);
+        }
+        else
+        {
+          var song_name = data_json["d"]["song"]["title"]
+          var artist_name = data_json["d"]["song"]["artists"][0]["name"]
+          set_music(client, song_name + " - " + artist_name);
+        }
       }
 
     }
