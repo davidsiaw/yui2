@@ -44,7 +44,7 @@ function find_channel(client, chan_id, on_success, on_failure)
   }
   else
   {
-    on_failure(chan_id);
+    setTimeout( function(){ find_channel(client, chan_id, on_success, on_failure); }, 10);
   }
 }
 
