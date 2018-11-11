@@ -152,7 +152,8 @@ function start_websocket_client(logging_channel) {
     try {
       var data_json = JSON.parse(data);
 
-      send(logging_channel, "[WSMSG]", "```\n", JSON.stringify(data_json, null, 2), "\n```");
+      //send(logging_channel, "[WSMSG]", "```\n", JSON.stringify(data_json, null, 2), "\n```");
+      console.log("[WSMSG]", JSON.stringify(data_json, null, 2));
 
       if (data_json["op"] === 1 && data_json["t"] === "TRACK_UPDATE")
       {
